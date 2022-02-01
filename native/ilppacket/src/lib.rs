@@ -3,7 +3,7 @@ use rustler::types::binary::{Binary};
 use bytes::{BytesMut};
 
 use rustler::types::atom::{ok, error};
-use rustler::{Atom, Encoder, Env, Term, NifResult};
+use rustler::{Atom, Encoder, Env, Term, NifResult, OwnedBinary};
 use std::convert::TryFrom;
 use crate::custom_atoms::{fulfill, prepare, reject};
 
@@ -27,7 +27,9 @@ fn decode<'a>(env: Env<'a>, bin: Binary) -> NifResult<Term<'a>> {
 
 fn response<'a>(env: Env<'a>, packet_type: Atom, data: &[u8]) -> NifResult<Term<'a>> {
     let keys = ["type", "data"];
-    let values = [packet_type.encode(env), data.encode(env)];
+    let mut data_bin: OwnedBinary = OwnedBinary::new(data.len()).unwrap();
+    data_bin.as_mut_slice().copy_from_slice(data);
+    let values = [packet_type.encode(env), data_bin.release(env).encode(env)];
     let result = Term::map_from_arrays(env, &keys.map( |x| x.encode(env)), &values);
     Ok((ok(), result.unwrap()).encode(env))
 }

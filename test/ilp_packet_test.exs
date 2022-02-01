@@ -82,14 +82,9 @@ defmodule IlpPacketTest do
   """
 
   test "decode/1" do
-    prepare = @prepare
-    fulfill = @fulfill
-    reject = @reject
-    data = :binary.bin_to_list(@data)
-
-    assert {:ok, %{"type" => :prepare, "data" => ^data}} = IlpPacket.decode(prepare)
-    assert {:ok, %{"type" => :fulfill, "data" => ^data}} = IlpPacket.decode(fulfill)
-    assert {:ok, %{"type" => :reject, "data" => ^data}} = IlpPacket.decode(reject)
+    assert {:ok, %{"type" => :prepare, "data" => @data}} = IlpPacket.decode(@prepare)
+    assert {:ok, %{"type" => :fulfill, "data" => @data}} = IlpPacket.decode(@fulfill)
+    assert {:ok, %{"type" => :reject, "data" => @data}} = IlpPacket.decode(@reject)
     assert {:error, "Invalid Packet Unknown packet type: None"} = IlpPacket.decode("")
   end
 end
