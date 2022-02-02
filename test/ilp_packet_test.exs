@@ -82,9 +82,28 @@ defmodule IlpPacketTest do
   """
 
   test "decode/1" do
-    assert {:ok, %{"type" => :prepare, "data" => @data}} = IlpPacket.decode(@prepare)
-    assert {:ok, %{"type" => :fulfill, "data" => @data}} = IlpPacket.decode(@fulfill)
-    assert {:ok, %{"type" => :reject, "data" => @data}} = IlpPacket.decode(@reject)
+    assert {:ok,
+            %{
+              "type" => :prepare,
+              "amount" => 107,
+              "expires_at" => "2018-06-07 20:48:42.483 UTC",
+              "execution_condition" => _,
+              "destination" => "example.alice",
+              "data" => @data
+            }} = IlpPacket.decode(@prepare)
+
+    assert {:ok, %{"type" => :fulfill, "fulfillment" => _, "data" => @data}} =
+             IlpPacket.decode(@fulfill)
+
+    assert {:ok,
+            %{
+              "type" => :reject,
+              "code" => "F99",
+              "triggered_by" => "example.connector",
+              "message" => 'Some error',
+              "data" => @data
+            }} = IlpPacket.decode(@reject)
+
     assert {:error, "Invalid Packet Unknown packet type: None"} = IlpPacket.decode("")
   end
 end
