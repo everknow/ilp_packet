@@ -81,6 +81,11 @@ defmodule IlpPacketTest do
   \x41\xe4\xa3\x80\xf0\
   """
 
+  @prepare_execution_condition """
+  \x11\x7b\x43\x4f\x1a\x54\xe9\x04\x4f\x4f\x54\x92\x3b\x2c\xff\x9e\
+  \x4a\x6d\x42\x0a\xe2\x81\xd5\x02\x5d\x7b\xb0\x40\xc4\xb4\xc0\x4a\
+  """
+
   test "decode/1" do
     assert {:ok,
             %{
@@ -105,5 +110,17 @@ defmodule IlpPacketTest do
             }} = IlpPacket.decode(@reject)
 
     assert {:error, "Invalid Packet Unknown packet type: None"} = IlpPacket.decode("")
+  end
+
+  test "encode/1" do
+    params = %{
+      "amount" => 107,
+      "data" => @data,
+      "destination" => "example.alice",
+      "execution_condition" => @prepare_execution_condition,
+      "expires_at" => "2018-06-07 20:48:42.483"
+    }
+
+    {:error, "could not parse expires_at as DateTime"} = IlpPacket.encode_prepare(params)
   end
 end

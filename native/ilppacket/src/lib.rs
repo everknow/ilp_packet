@@ -1,14 +1,26 @@
-use interledger_packet::{Packet, Prepare, Fulfill, Reject};
-use rustler::types::binary::{Binary};
-use bytes::{BytesMut};
+use interledger_packet::{Address,
+    Fulfill,
+    FulfillBuilder,
+    Packet,
+    Prepare,
+    PrepareBuilder,
+    Reject,
+    RejectBuilder
+};
+
+use rustler::types::binary::Binary;
+use bytes::BytesMut;
 
 use rustler::types::atom::{ok, error};
-use rustler::{Encoder, Env, Term, NifResult, OwnedBinary};
+use rustler::{Env, Encoder, NifResult, OwnedBinary, Term, Error};
 use std::convert::TryFrom;
+use std::collections::HashMap;
+use std::str;
 use crate::custom_atoms::{fulfill, prepare, reject};
 
 use chrono::offset::Utc;
 use chrono::DateTime;
+use std::time::SystemTime;
 
 mod custom_atoms {
     rustler::atoms! {
@@ -16,6 +28,26 @@ mod custom_atoms {
         fulfill,
         reject
     }
+}
+
+#[macro_export]
+macro_rules! err {
+    ( $( $x:expr ),* ) => {
+        {
+            $(
+                Err(Error::Term(Box::new($x)))
+            )*
+        }
+    };
+}
+macro_rules! error {
+    ( $( $x:expr ),* ) => {
+        {
+            $(
+                Error::Term(Box::new($x))
+            )*
+        }
+    };
 }
 
 #[rustler::nif(schedule = "DirtyCpu")]
@@ -118,8 +150,46 @@ impl PacketDecoder for Reject {
     }
 }
 
+#[rustler::nif(schedule = "DirtyCpu")]
+fn encode_prepare<'a>(env: Env<'a>, args: Term) -> NifResult<Term<'a>> {
+    let params = args.decode::<HashMap<String, Term>>().or(err!("args need to be a string keyed map"))?;
+
+    let amount = params.get("amount").ok_or(error!("amount is missing"))?;
+    let u64_amount: u64 = amount.decode::<u64>().or(err!("expected amount as u64"))?;
+
+    let destination = params.get("destination").ok_or(error!("destination is missing"))?;
+    let destination_address = Address::try_from(destination.into_binary()?.as_slice()).or(err!("invalid destination address"))?;
+
+    let execution_condition = params.get("execution_condition").ok_or(error!("execution_condition is missing"))?;
+    let u8_execution_condition = execution_condition.into_binary().or(err!("could not decode execution_condition"))?.as_slice();
+    let bin_execution_condition = &<[u8; 32]>::try_from(u8_execution_condition).or(err!("execution_condition is invalid"))?;
+
+    let data = params.get("data").ok_or(error!("data is missing"))?;
+    let bin_data = data.into_binary().or(err!("data is invalid"))?.as_slice();
+
+    let expires_at = params.get("expires_at").ok_or(error!("expires_at is missing"))?;
+    let bin_expires_at = expires_at.into_binary().or(err!("expires_at is invalid"))?.as_slice();
+    let utf8_expires_at = str::from_utf8(bin_expires_at).or(err!("expires_at should be utf8"))?;
+    let date_time_expires_at = DateTime::parse_from_rfc3339(utf8_expires_at).or(err!("could not parse expires_at as DateTime"))?;
+    let system_time_expires_at: SystemTime = date_time_expires_at.with_timezone(&Utc).into();
+
+    let prepare = PrepareBuilder {
+        amount: u64_amount,
+        destination: destination_address,
+        expires_at: system_time_expires_at,
+        execution_condition: bin_execution_condition,
+        data: bin_data
+    }.build();
+
+    return Ok((ok(), BytesMut::from(prepare).encode(env)).encode(env));
+}
+
+// fn slice_to_array(slice: &[u8]) -> &[u8; 32] {
+//     slice.try_into().expect("slice with incorrect length")
+// }
+
 fn tuple_response<'a>(env: Env<'a>, result: NifResult<Term>) -> NifResult<Term<'a>> {
     return Ok((ok(), result.unwrap()).encode(env))
 }
 
-rustler::init!("Elixir.IlpPacket", [decode]);
+rustler::init!("Elixir.IlpPacket", [decode, encode_prepare]);

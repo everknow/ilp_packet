@@ -4,4 +4,6 @@ defmodule IlpPacket do
   use Rustler, otp_app: :ilp_packet, crate: "ilppacket"
 
   def decode(_a), do: :erlang.nif_error(:nif_not_loaded)
+
+  def encode_prepare(_a), do: :erlang.nif_error(:nif_not_loaded)
 end
