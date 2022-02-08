@@ -1,11 +1,11 @@
 [package]
-name = "ilppacket"
+name = "packet"
 version = "0.1.0"
 authors = []
 edition = "2018"
 
 [lib]
-name = "ilppacket"
+name = "packet"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 

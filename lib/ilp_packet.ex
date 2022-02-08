@@ -1,7 +1,7 @@
 defmodule IlpPacket do
   @moduledoc false
 
-  use Rustler, otp_app: :ilp_packet, crate: "ilppacket"
+  use Rustler, otp_app: :ilp_packet, crate: "packet"
 
   def decode(_a), do: :erlang.nif_error(:nif_not_loaded)
 

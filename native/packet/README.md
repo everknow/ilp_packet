@@ -8,7 +8,7 @@
 
 ```elixir
 defmodule IlpPacket do
-    use Rustler, otp_app: :ilp_packet, crate: "ilppacket"
+    use Rustler, otp_app: :ilp_packet, crate: "packet"
 
     # When your NIF is loaded, it will override this function.
     def add(_a, _b), do: :erlang.nif_error(:nif_not_loaded)
