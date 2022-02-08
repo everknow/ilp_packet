@@ -129,7 +129,114 @@ defmodule IlpPacketTest do
         "expires_at" => "2018-06-07T20:48:42.483Z"
       }
 
-      {:ok, ^expected_prepare} = IlpPacket.encode_prepare(params)
+      assert {:ok, ^expected_prepare} = IlpPacket.encode_prepare(params)
+    end
+
+    test "error when map has no string keys" do
+      assert {:error, "args need to be a string keyed map"} ==
+               IlpPacket.encode_prepare(%{incorrect: :map})
+    end
+
+    test "error when amount is missing" do
+      assert {:error, "amount is missing"} == IlpPacket.encode_prepare(%{"test" => "test"})
+    end
+
+    test "error when amount is not u64" do
+      assert {:error, "expected amount as u64"} == IlpPacket.encode_prepare(%{"amount" => "test"})
+    end
+
+    test "error when destination is missing" do
+      assert {:error, "destination is missing"} == IlpPacket.encode_prepare(%{"amount" => 136})
+    end
+
+    test "error when cannot be decoded" do
+      assert {:error, "invalid destination address"} ==
+               IlpPacket.encode_prepare(%{"amount" => 136, "destination" => "address/invalid"})
+    end
+
+    test "error when execution_condition is missing" do
+      assert {:error, "execution_condition is missing"} ==
+               IlpPacket.encode_prepare(%{"amount" => 136, "destination" => "example.alice"})
+    end
+
+    test "error when execution_condition is not binary" do
+      assert {:error, "could not decode execution_condition"} ==
+               IlpPacket.encode_prepare(%{
+                 "amount" => 136,
+                 "destination" => "example.alice",
+                 "execution_condition" => 23
+               })
+    end
+
+    test "error when execution_condition has wrong length" do
+      assert {:error, "expected execution_condition to be [u8; 32]"} ==
+               IlpPacket.encode_prepare(%{
+                 "amount" => 136,
+                 "destination" => "example.alice",
+                 "execution_condition" => ""
+               })
+    end
+
+    test "error when data is missing" do
+      assert {:error, "data is missing"} ==
+               IlpPacket.encode_prepare(%{
+                 "amount" => 136,
+                 "destination" => "example.alice",
+                 "execution_condition" => "12345678901234567890123456789012"
+               })
+    end
+
+    test "error when data is not binary" do
+      assert {:error, "expected data to be binary"} ==
+               IlpPacket.encode_prepare(%{
+                 "amount" => 136,
+                 "destination" => "example.alice",
+                 "execution_condition" => "12345678901234567890123456789012",
+                 "data" => 23
+               })
+    end
+
+    test "error when expires_at is missing" do
+      assert {:error, "expires_at is missing"} ==
+               IlpPacket.encode_prepare(%{
+                 "amount" => 136,
+                 "destination" => "example.alice",
+                 "execution_condition" => "12345678901234567890123456789012",
+                 "data" => ""
+               })
+    end
+
+    test "error when expires_at is not binary" do
+      assert {:error, "expected expires_at to be binary"} ==
+               IlpPacket.encode_prepare(%{
+                 "amount" => 136,
+                 "destination" => "example.alice",
+                 "execution_condition" => "12345678901234567890123456789012",
+                 "data" => "",
+                 "expires_at" => 23
+               })
+    end
+
+    test "error when expires_at is not utf8" do
+      assert {:error, "expected expires_at to be binary"} ==
+               IlpPacket.encode_prepare(%{
+                 "amount" => 136,
+                 "destination" => "example.alice",
+                 "execution_condition" => "12345678901234567890123456789012",
+                 "data" => "",
+                 "expires_at" => 0xF9
+               })
+    end
+
+    test "error when expires_at has wrong format" do
+      assert {:error, "could not parse expires_at as DateTime"} ==
+               IlpPacket.encode_prepare(%{
+                 "amount" => 136,
+                 "destination" => "example.alice",
+                 "execution_condition" => "12345678901234567890123456789012",
+                 "data" => "",
+                 "expires_at" => "2018-06-07 20:48:42.483Z"
+               })
     end
   end
 
@@ -139,10 +246,34 @@ defmodule IlpPacketTest do
 
       params = %{
         "fulfillment" => @fulfillment,
-        "data" => @data,
+        "data" => @data
       }
 
-      {:ok, ^expected_fulfill} = IlpPacket.encode_fulfill(params)
+      assert {:ok, ^expected_fulfill} = IlpPacket.encode_fulfill(params)
+    end
+
+    test "error when fulfillment is missing" do
+      assert {:error, "fulfillment is missing"} == IlpPacket.encode_fulfill(%{})
+    end
+
+    test "error when fulfillment is not binary" do
+      assert {:error, "expected fulfillment to be binary"} ==
+               IlpPacket.encode_fulfill(%{"fulfillment" => 23})
+    end
+
+    test "error when fulfillment has wrong format" do
+      assert {:error, "fulfillment should be [u8; 32]"} ==
+               IlpPacket.encode_fulfill(%{"fulfillment" => ""})
+    end
+
+    test "error when data is missing" do
+      assert {:error, "data is missing"} ==
+               IlpPacket.encode_fulfill(%{"fulfillment" => @fulfillment})
+    end
+
+    test "error when data is not binary" do
+      assert {:error, "expected data to be binary"} ==
+               IlpPacket.encode_fulfill(%{"fulfillment" => @fulfillment, "data" => 23})
     end
   end
 
@@ -154,10 +285,69 @@ defmodule IlpPacketTest do
         "code" => "F99",
         "triggered_by" => "example.connector",
         "message" => "Some error",
-        "data" => @data,
+        "data" => @data
       }
 
-      {:ok, ^expected_reject} = IlpPacket.encode_reject(params)
+      assert {:ok, ^expected_reject} = IlpPacket.encode_reject(params)
+    end
+
+    test "error when code is missing" do
+      assert {:error, "code is missing"} == IlpPacket.encode_reject(%{})
+    end
+
+    test "error when code is not binary" do
+      assert {:error, "expected code to be binary"} == IlpPacket.encode_reject(%{"code" => 23})
+    end
+
+    test "error when code has wrong format" do
+      assert {:error, "expected code to be [u8; 3]"} == IlpPacket.encode_reject(%{"code" => ""})
+    end
+
+    test "error when message is missing" do
+      assert {:error, "message is missing"} == IlpPacket.encode_reject(%{"code" => "F99"})
+    end
+
+    test "error when message is not binary" do
+      assert {:error, "expected message to be binary"} ==
+               IlpPacket.encode_reject(%{"code" => "F99", "message" => 23})
+    end
+
+    test "error when triggered_by is missing" do
+      assert {:error, "triggered_by is missing"} ==
+               IlpPacket.encode_reject(%{"code" => "F99", "message" => ""})
+    end
+
+    test "error when triggered_by is not binary" do
+      assert {:error, "expected triggered_by to be binary"} ==
+               IlpPacket.encode_reject(%{"code" => "F99", "message" => "", "triggered_by" => 23})
+    end
+
+    test "error when triggered_by has wrong format" do
+      assert {:error, "invalid triggered_by address"} ==
+               IlpPacket.encode_reject(%{
+                 "code" => "F99",
+                 "message" => "",
+                 "triggered_by" => "test/invalid"
+               })
+    end
+
+    test "error when data is missing" do
+      assert {:error, "data is missing"} ==
+               IlpPacket.encode_reject(%{
+                 "code" => "F99",
+                 "message" => "",
+                 "triggered_by" => "test.address"
+               })
+    end
+
+    test "error when data is not binary" do
+      assert {:error, "expected data to be binary"} ==
+               IlpPacket.encode_reject(%{
+                 "code" => "F99",
+                 "message" => "",
+                 "triggered_by" => "test.address",
+                 "data" => 23
+               })
     end
   end
 end
