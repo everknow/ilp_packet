@@ -86,6 +86,11 @@ defmodule IlpPacketTest do
   \x4a\x6d\x42\x0a\xe2\x81\xd5\x02\x5d\x7b\xb0\x40\xc4\xb4\xc0\x4a\
   """
 
+  @fulfillment """
+  \x11\x7b\x43\x4f\x1a\x54\xe9\x04\x4f\x4f\x54\x92\x3b\x2c\xff\x9e\
+  \x4a\x6d\x42\x0a\xe2\x81\xd5\x02\x5d\x7b\xb0\x40\xc4\xb4\xc0\x4a\
+  """
+
   test "decode/1" do
     assert {:ok,
             %{
@@ -112,15 +117,47 @@ defmodule IlpPacketTest do
     assert {:error, "Invalid Packet Unknown packet type: None"} = IlpPacket.decode("")
   end
 
-  test "encode/1" do
-    params = %{
-      "amount" => 107,
-      "data" => @data,
-      "destination" => "example.alice",
-      "execution_condition" => @prepare_execution_condition,
-      "expires_at" => "2018-06-07 20:48:42.483"
-    }
+  describe "encode_prepare/1" do
+    test "successfully returns the binary" do
+      expected_prepare = :binary.bin_to_list(@prepare)
 
-    {:error, "could not parse expires_at as DateTime"} = IlpPacket.encode_prepare(params)
+      params = %{
+        "amount" => 107,
+        "data" => @data,
+        "destination" => "example.alice",
+        "execution_condition" => @prepare_execution_condition,
+        "expires_at" => "2018-06-07T20:48:42.483Z"
+      }
+
+      {:ok, ^expected_prepare} = IlpPacket.encode_prepare(params)
+    end
+  end
+
+  describe "encode_fulfill/1" do
+    test "successfully returns the binary" do
+      expected_fulfill = :binary.bin_to_list(@fulfill)
+
+      params = %{
+        "fulfillment" => @fulfillment,
+        "data" => @data,
+      }
+
+      {:ok, ^expected_fulfill} = IlpPacket.encode_fulfill(params)
+    end
+  end
+
+  describe "encode_reject/1" do
+    test "successfully returns the binary" do
+      expected_reject = :binary.bin_to_list(@reject)
+
+      params = %{
+        "code" => "F99",
+        "triggered_by" => "example.connector",
+        "message" => "Some error",
+        "data" => @data,
+      }
+
+      {:ok, ^expected_reject} = IlpPacket.encode_reject(params)
+    end
   end
 end

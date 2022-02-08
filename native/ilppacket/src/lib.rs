@@ -1,4 +1,5 @@
 use interledger_packet::{Address,
+    ErrorCode,
     Fulfill,
     FulfillBuilder,
     Packet,
@@ -158,11 +159,17 @@ fn encode_prepare<'a>(env: Env<'a>, args: Term) -> NifResult<Term<'a>> {
     let u64_amount: u64 = amount.decode::<u64>().or(err!("expected amount as u64"))?;
 
     let destination = params.get("destination").ok_or(error!("destination is missing"))?;
-    let destination_address = Address::try_from(destination.into_binary()?.as_slice()).or(err!("invalid destination address"))?;
+    let destination_address = Address::try_from(destination.into_binary()?.as_slice())
+        .or(err!("invalid destination address"))?;
 
-    let execution_condition = params.get("execution_condition").ok_or(error!("execution_condition is missing"))?;
-    let u8_execution_condition = execution_condition.into_binary().or(err!("could not decode execution_condition"))?.as_slice();
-    let bin_execution_condition = &<[u8; 32]>::try_from(u8_execution_condition).or(err!("execution_condition is invalid"))?;
+    let execution_condition = params.get("execution_condition")
+        .ok_or(error!("execution_condition is missing"))?;
+    
+    let u8_execution_condition = execution_condition.into_binary()
+        .or(err!("could not decode execution_condition"))?.as_slice();
+    
+    let bin_execution_condition = &<[u8; 32]>::try_from(u8_execution_condition)
+        .or(err!("execution_condition is invalid"))?;
 
     let data = params.get("data").ok_or(error!("data is missing"))?;
     let bin_data = data.into_binary().or(err!("data is invalid"))?.as_slice();
@@ -170,7 +177,10 @@ fn encode_prepare<'a>(env: Env<'a>, args: Term) -> NifResult<Term<'a>> {
     let expires_at = params.get("expires_at").ok_or(error!("expires_at is missing"))?;
     let bin_expires_at = expires_at.into_binary().or(err!("expires_at is invalid"))?.as_slice();
     let utf8_expires_at = str::from_utf8(bin_expires_at).or(err!("expires_at should be utf8"))?;
-    let date_time_expires_at = DateTime::parse_from_rfc3339(utf8_expires_at).or(err!("could not parse expires_at as DateTime"))?;
+
+    let date_time_expires_at = DateTime::parse_from_rfc3339(utf8_expires_at)
+        .or(err!("could not parse expires_at as DateTime"))?;
+        
     let system_time_expires_at: SystemTime = date_time_expires_at.with_timezone(&Utc).into();
 
     let prepare = PrepareBuilder {
@@ -184,12 +194,58 @@ fn encode_prepare<'a>(env: Env<'a>, args: Term) -> NifResult<Term<'a>> {
     return Ok((ok(), BytesMut::from(prepare).encode(env)).encode(env));
 }
 
-// fn slice_to_array(slice: &[u8]) -> &[u8; 32] {
-//     slice.try_into().expect("slice with incorrect length")
-// }
+#[rustler::nif(schedule = "DirtyCpu")]
+fn encode_fulfill<'a>(env: Env<'a>, args: Term) -> NifResult<Term<'a>> {
+    let params = args.decode::<HashMap<String, Term>>().or(err!("args need to be a string keyed map"))?;
+
+    let fulfillment = params.get("fulfillment").ok_or(error!("fulfillment is missing"))?;
+    let u8_fulfillment = fulfillment.into_binary().or(err!("could not decode fulfillment"))?.as_slice();
+    let bin_fulfillment = &<[u8; 32]>::try_from(u8_fulfillment).or(err!("fulfillment is invalid"))?;
+
+
+    let data = params.get("data").ok_or(error!("data is missing"))?;
+    let bin_data = data.into_binary().or(err!("data is invalid"))?.as_slice();
+
+    let fulfill = FulfillBuilder {
+        fulfillment: bin_fulfillment,
+        data: bin_data
+    }.build();
+
+    return Ok((ok(), BytesMut::from(fulfill).encode(env)).encode(env));
+}
+
+#[rustler::nif(schedule = "DirtyCpu")]
+fn encode_reject<'a>(env: Env<'a>, args: Term) -> NifResult<Term<'a>> {
+    let params = args.decode::<HashMap<String, Term>>().or(err!("args need to be a string keyed map"))?;
+
+    let code = params.get("code").ok_or(error!("code is missing"))?;
+    let bin_code = <[u8; 3]>::try_from(code.into_binary().or(err!("code is invalid, expected binary"))?
+        .as_slice()).or(err!("code is invalid, expected 3 chars"))?;
+
+    let error_code = ErrorCode::new(bin_code);
+
+    let message = params.get("message").ok_or(error!("message is missing"))?;
+    let bin_message = message.into_binary().or(err!("message is invalid, expected binary"))?.as_slice();
+
+    let triggered_by = params.get("triggered_by").ok_or(error!("triggered_by is missing"))?;
+    let triggered_by_address = Address::try_from(triggered_by.into_binary()?.as_slice())
+        .or(err!("invalid triggered_by address"))?;
+
+    let data = params.get("data").ok_or(error!("data is missing"))?;
+    let bin_data = data.into_binary().or(err!("data is invalid, expected binary"))?.as_slice();
+
+    let reject = RejectBuilder {
+        code: error_code,
+        message: bin_message,
+        triggered_by: Some(&triggered_by_address),
+        data: bin_data
+    }.build();
+
+    return Ok((ok(), BytesMut::from(reject).encode(env)).encode(env));
+}
 
 fn tuple_response<'a>(env: Env<'a>, result: NifResult<Term>) -> NifResult<Term<'a>> {
     return Ok((ok(), result.unwrap()).encode(env))
 }
 
-rustler::init!("Elixir.IlpPacket", [decode, encode_prepare]);
+rustler::init!("Elixir.IlpPacket", [decode, encode_prepare, encode_fulfill, encode_reject]);
